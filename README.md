@@ -23,7 +23,7 @@ This project is a python implementation of Deep Image Analogy.https://arxiv.org/
 
 ## Usage (demo)
 
-```python
+```bash
 python main.py --resize_ratio 0.5 --weight 2 --img_A_path data/demo/ava.png --img_BP_path data/demo/mona.png --use_cuda True
 ```
 
