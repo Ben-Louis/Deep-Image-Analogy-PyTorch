@@ -31,7 +31,7 @@ class VGG19:
     def __init__(self, use_cuda=True):
 
         url = "https://s3-us-west-2.amazonaws.com/jcjohns-models/vgg19-d01eb7cb.pth"
-        vgg19_model = models.vgg19(pretrained=True)
+        vgg19_model = models.vgg19(pretrained=False)
         vgg19_model.load_state_dict(model_zoo.load_url(url), strict=False)
         self.cnn_temp = vgg19_model.features
         self.model = FeatureExtractor()  # the new Feature extractor module network
