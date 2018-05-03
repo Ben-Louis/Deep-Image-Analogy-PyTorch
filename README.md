@@ -19,6 +19,10 @@ This project is a python implementation of Deep Image Analogy.https://arxiv.org/
 
    See [pytorch](http://pytorch.org/) for installation
 
+   Codes in branch "master" works with pytorch 0.4
+
+   Codes in branch "pytorch0.3" works with pytorch 0.3
+
  - cuda (CPU version is not implemented yet)
 
 ## Usage (demo)
