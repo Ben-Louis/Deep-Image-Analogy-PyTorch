@@ -134,7 +134,7 @@ class VGG19:
             loss = go(x)
             loss.backward()
             grad = x.grad.data.view(-1)
-            return loss.data[0], grad
+            return loss.item(), grad
 
         # ================
         noise = noise.view(-1)
