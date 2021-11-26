@@ -23,7 +23,7 @@ if __name__=="__main__":
     print('Loading images...', end='')
     img_A = load_image(args.img_A_path, args.resize_ratio)
     img_BP = load_image(args.img_BP_path, args.resize_ratio)
-    print('\rImages loaded successfully!')
+    print('\rImages are loaded successfully!')
 
 
     # setting parameters
@@ -62,10 +62,4 @@ if __name__=="__main__":
     cv2.imwrite(save_path+'/img_AP.png', img_AP)
     cv2.imwrite(save_path+'/img_B.png', img_B)
     print('Image saved!')
-
-
-    
-    
-    
-
 

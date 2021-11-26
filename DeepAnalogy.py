@@ -125,11 +125,4 @@ def analogy(img_A, img_BP, config):
     img_B = np.clip(img_B, 0, 255)    
 
 
-    return img_AP, img_B, str(datetime.timedelta(seconds=time.time()- start_time_0))[:-7]
-
-
-
-
-
-
-
+    return img_AP, img_B, str(datetime.timedelta(seconds=time.time() - start_time_0))[:-7]
