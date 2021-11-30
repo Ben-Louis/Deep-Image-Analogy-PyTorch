@@ -1,70 +1,42 @@
 import numpy as np
+import torch
 import torch.multiprocessing as mp
 from torch.multiprocessing import Pool
 
 
-def init_nnf(size, B_size=None):
-    nnf = np.zeros(shape=(2, size[0], size[1])).astype(np.int)
-    nnf[0] = np.array([np.arange(size[0])] * size[1]).T
-    nnf[1] = np.array([np.arange(size[1])] * size[0])
-    nnf = nnf.transpose((1, 2, 0))
-    if B_size is not None:
-        nnf[:, :, 0] = nnf[:, :, 0] * (B_size[0] / size[0])
-        nnf[:, :, 1] = nnf[:, :, 1] * (B_size[1] / size[1])
-        nnf = np.array(nnf, dtype=np.int)
-
-    return nnf
+def init_nnf(source_size, target_size=None):
+    target_size = source_size if target_size is None else target_size
+    y, x = np.meshgrid(np.linspace(0, target_size[1]-1, source_size[1], dtype=np.int32),
+                       np.linspace(0, target_size[0]-1, source_size[0], dtype=np.int32))
+    return np.stack((x, y), axis=2)
 
 
-def upSample_nnf(nnf, size=None):
+def upSample_nnf(nnf, target_size=None):
+    target_size = [x * 2 for x in nnf.shape] if target_size is None else target_size
+    ratio = np.array([target_size[0] / nnf.shape[0], target_size[1] / nnf.shape[1]])
+    coords = np.stack(np.meshgrid(np.arange(target_size[1]), np.arange(target_size[0]))[::-1], axis=2)
+    quot = np.array(coords // ratio[None, None, :], dtype=np.int32)
+    nnf_up = nnf[quot[:,:,0], quot[:,:,1]] * ratio[None, None, :]
+    nnf_up = np.array(nnf_up + coords - quot * ratio[None, None, :], dtype=np.int32)
+    return nnf_up
+
+
+def avg_vote(nnf, img, patch_size):
+    output = np.zeros([*nnf.shape[:2], img.shape[-1]])
     ah, aw = nnf.shape[:2]
-
-    if size is None:
-        size = [ah * 2, aw * 2]
-
-    bh, bw = size
-    ratio_h, ratio_w = bh / ah, bw / aw
-    target = np.zeros(shape=(size[0], size[1], 2)).astype(np.int)
-
-    for by in range(bh):
-        for bx in range(bw):
-            quot_h, quot_w = int(by // ratio_h), int(bx // ratio_w)
-            # print(quot_h, quot_w)
-            rem_h, rem_w = (by - quot_h * ratio_h), (bx - quot_w * ratio_w)
-            vy, vx = nnf[quot_h, quot_w]
-            vy = int(ratio_h * vy + rem_h)
-            vx = int(ratio_w * vx + rem_w)
-            target[by, bx] = [vy, vx]
-
-    return target
-
-
-def avg_vote(nnf, img, patch_size, A_size, B_size):
-    assert img.shape[0] == B_size[0] and img.shape[1] == B_size[1], "[{},{}], [{},{}]".format(img.shape[0],
-                                                                                              img.shape[1], B_size[0],
-                                                                                              B_size[1])
-    final = np.zeros(list(A_size) + [img.shape[2], ])
-
-    ah, aw = A_size
-    bh, bw = B_size
-    for ay in range(A_size[0]):
-        for ax in range(A_size[1]):
-
+    bh, bw = img.shape[:2]
+    for ay in range(ah):
+        for ax in range(aw):
             count = 0
             for dy in range(-(patch_size // 2), (patch_size // 2 + 1)):
                 for dx in range(-(patch_size // 2), (patch_size // 2 + 1)):
-
-                    if ((ax + dx) < aw and (ax + dx) >= 0 and (ay + dy) < ah and (ay + dy) >= 0):
+                    if aw > (ax + dx) >= 0 and ah > (ay + dy) >= 0:
                         by, bx = nnf[ay + dy, ax + dx]
-
-                        if ((bx - dx) < bw and (bx - dx) >= 0 and (by - dy) < bh and (by - dy) >= 0):
+                        if bw > (bx - dx) >= 0 and bh > (by - dy) >= 0:
                             count += 1
-                            final[ay, ax, :] += img[by - dy, bx - dx, :]
-
-            if count > 0:
-                final[ay, ax] /= count
-
-    return final
+                            output[ay, ax] += img[by - dy, bx - dx]
+            if count > 0: output[ay, ax] /= count 
+    return output
 
 
 def propagate(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, rand_search_radius=200):
@@ -81,7 +53,7 @@ def propagate(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, rand_s
 
     manager = mp.Manager()
     q = manager.Queue(A_size[1] * A_size[0])
-    cpus = min(mp.cpu_count(), A_size[0] // 20 + 1)
+    cpus = min(8, A_size[0] // 20 + 1)
     for i in range(iters):
 
         p = Pool(cpus)
@@ -230,8 +202,6 @@ def pixelmatch(q, ax_start, ay_start, cpus, nnf, nnd, A_size, B_size, feat_A, fe
             rand_d = rand_search_radius
 
             while rand_d >= 1:
-
-
                 xmin = max(xbest - rand_d, 0)
                 xmax = min(xbest + rand_d + 1, b_cols)
                 xmin, xmax = min(xmin, xmax), max(xmin, xmax)
@@ -252,9 +222,7 @@ def pixelmatch(q, ax_start, ay_start, cpus, nnf, nnd, A_size, B_size, feat_A, fe
                     nnf[ay, ax] = np.array([ybest, xbest])
                     nnd[ay, ax] = dbest
 
-
                 rand_d = rand_d // 2
-
 
             q.put([ax, ay, xbest, ybest, dbest])
 
@@ -272,61 +240,60 @@ def cal_dist(ay, ax, by, bx, feat_A, feat_AP, feat_B, feat_BP, A_size, B_size, p
     dy0 = min(ay, by, dy0)
     dy1 = min(A_size[0] - ay, B_size[0] - by, dy1)
 
-    try:
-        if feat_A.shape[2] == 3:
-            dist1 = np.sum(
-                (feat_A[ay - dy0:ay + dy1, ax - dx0:ax + dx1] - feat_B[by - dy0:by + dy1, bx - dx0:bx + dx1]) ** 2)
-            dist2 = np.sum(
-                (feat_AP[ay - dy0:ay + dy1, ax - dx0:ax + dx1] - feat_BP[by - dy0:by + dy1, bx - dx0:bx + dx1]) ** 2)
-        else:
-            dist1 = -np.sum(feat_A[ay - dy0:ay + dy1, ax - dx0:ax + dx1] * feat_B[by - dy0:by + dy1, bx - dx0:bx + dx1])
-            dist2 = -np.sum(
-                feat_AP[ay - dy0:ay + dy1, ax - dx0:ax + dx1] * feat_BP[by - dy0:by + dy1, bx - dx0:bx + dx1])
-        dist = (dist1 + dist2) / ((dx1 + dx0) * (dy1 + dy0))
-        # dist = clamp(dist, -np.inf, cutoff)
-    except Exception as e:
-        print(e)
-        print("dx0:{}; dx1:{}; dy0:{}; dy1:{}; ax:{}; ay:{}; bx:{}; by:{}".format(dx0, dx1, dy0, dy1, ax, ay, bx, by))
+    dist1 = -np.sum(feat_A[ay - dy0:ay + dy1, ax - dx0:ax + dx1] * feat_B[by - dy0:by + dy1, bx - dx0:bx + dx1])
+    dist2 = -np.sum(feat_AP[ay - dy0:ay + dy1, ax - dx0:ax + dx1] * feat_BP[by - dy0:by + dy1, bx - dx0:bx + dx1])
+    dist = (dist1 + dist2) / ((dx1 + dx0) * (dy1 + dy0))
+
     return dist
 
 
-def clamp(arr, low, high):
-    arr = arr.reshape([1] + arr.shape)
-    low = np.ones(arr.shape) * low
-    high = np.ones(arr.shape) * high
-    arr = np.max(np.concatenate([arr, low], axis=0), axis=0)
-    arr = arr.reshape([1] + arr.shape)
-    arr = np.min(np.concatenate([arr, high], axis=0), axis=0)
+import os 
+package_directory = os.path.dirname(os.path.abspath(__file__))
 
-    return arr
+import numpy as np
+import cv2
+import pycuda.autoinit
+import pycuda.driver as drv
+import numpy
+import pycuda.autoinit
+import pycuda.gpuarray as gpuarray
+import numpy as np
+from pycuda.compiler import SourceModule
+import cv2
 
+from PIL import Image
+def propagate_cuda(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, rand_search_radius=200):
+    mod = SourceModule(open(os.path.join(package_directory,"patchmatch.cu")).read(),no_extern_c=True)
+    patchmatch = mod.get_function("patch_match")
+    
+    rows = feat_A.shape[0]
+    cols = feat_A.shape[1]
+    channels = np.int32(feat_A.shape[2])
+    nnf_t = np.zeros(shape=(rows,cols), dtype=np.uint32)
+    nnd = np.random.rand(*nnf.shape[:2]).astype(np.float32)
+    threads = 20
+    
+    def get_blocks_for_dim(dim,blocks):
+        #if dim % blocks ==0:
+        #    return dim//blocks
+        return dim// blocks +1 
+    patchmatch(
+        drv.In(feat_A),
+        drv.In(feat_AP),
+        drv.In(feat_B),
+        drv.In(feat_BP),
+        drv.InOut(nnf),
+        drv.InOut(nnf_t),
+        drv.InOut(nnd),
+        np.int32(rows),
+        np.int32(cols),
+        channels,
+        np.int32(patch_size),
+        np.int32(iters),
+        np.int32(8),
+        np.int32(rand_search_radius),
+    block=(threads,threads,1),
+    grid=(get_blocks_for_dim(rows,threads),
+          get_blocks_for_dim(cols,threads)))
 
-def reconstruct_avg(nnf, img, patch_size, A_size, B_size):
-    assert img.shape[0] == B_size[0] and img.shape[1] == B_size[1], "[{},{}], [{},{}]".format(img.shape[0],
-                                                                                              img.shape[1], B_size[0],
-                                                                                              B_size[1])
-    final = np.zeros(list(A_size) + [3, ])
-    # ratio = min(A_size[0]/nnf.shape[0], img.shape[1]/nnf.shape[1])
-    # print("ratio:" + str(ratio))
-
-    ah, aw = A_size
-    bh, bw = B_size
-    for ay in range(A_size[0]):
-        for ax in range(A_size[1]):
-
-            count = 0
-            for dy in range(-(patch_size // 2), (patch_size // 2 + 1)):
-                for dx in range(-(patch_size // 2), (patch_size // 2 + 1)):
-
-                    if ((ax + dx) < aw and (ax + dx) >= 0 and (ay + dy) < ah and (ay + dy) >= 0):
-                        by, bx = nnf[ay + dy, ax + dx]
-
-                        if ((bx - dx) < bw and (bx - dx) >= 0 and (by - dy) < bh and (by - dy) >= 0):
-                            count += 1
-                            final[ay, ax, :] += img[by - dy, bx - dx, :]
-
-            if count > 0:
-                final[ay, ax] /= count
-
-    return final
-
+    return nnf, nnd
