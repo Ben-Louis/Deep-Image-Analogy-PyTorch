@@ -46,6 +46,7 @@ def propagate(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, rand_s
     A_size = feat_A.shape[:2]
     B_size = feat_B.shape[:2]
 
+    # initialize nnd (nearest neighbor distance)
     for ay in range(A_size[0]):
         for ax in range(A_size[1]):
             by, bx = nnf[ay, ax]
@@ -117,7 +118,6 @@ def pixelmatch(q, ax_start, ay_start, cpus, nnf, nnd, A_size, B_size, feat_A, fe
             dbest = nnd[ay, ax]
 
             for jump in [8, 4, 2, 1]:
-                # print("ax:{}; ay:{}; jump:".format(ax,ay)+str(jump))
 
                 # left
                 if ax - jump < a_cols and ax - jump >= 0:
@@ -131,13 +131,9 @@ def pixelmatch(q, ax_start, ay_start, cpus, nnf, nnd, A_size, B_size, feat_A, fe
                                        feat_B, feat_BP,
                                        A_size, B_size, patch_size)
                         if val < dbest:
-                            # print("update")
                             xbest, ybest, dbest = xp, yp, val
                             nnf[ay, ax] = np.array([ybest, xbest])
                             nnd[ay, ax] = dbest
-                # d = cal_dist(ay, ax, ybest, xbest,feat_A, feat_AP, feat_B, feat_BP, A_size, B_size, patch_size)
-                # if (dbest != d):
-                #    print('{}left, {} vs {}'.format([ay,ax,ybest,xbest], dbest, d))
 
                 # right
                 if ax + jump < a_cols:
@@ -151,13 +147,9 @@ def pixelmatch(q, ax_start, ay_start, cpus, nnf, nnd, A_size, B_size, feat_A, fe
                                        feat_B, feat_BP,
                                        A_size, B_size, patch_size)
                         if val < dbest:
-                            # print("update")
                             xbest, ybest, dbest = xp, yp, val
                             nnf[ay, ax] = np.array([ybest, xbest])
                             nnd[ay, ax] = dbest
-                            # d = cal_dist(ay, ax, ybest, xbest,feat_A, feat_AP, feat_B, feat_BP, A_size, B_size, patch_size)
-                # if (dbest != d):
-                #    print('{}right, {} vs {}'.format([ay,ax,ybest,xbest], dbest, d))
 
                 # up
                 if (ay - jump) < a_rows and (ay - jump) >= 0:
@@ -171,13 +163,9 @@ def pixelmatch(q, ax_start, ay_start, cpus, nnf, nnd, A_size, B_size, feat_A, fe
                                        feat_B, feat_BP,
                                        A_size, B_size, patch_size)
                         if val < dbest:
-                            # print("update")
                             xbest, ybest, dbest = xp, yp, val
                             nnf[ay, ax] = np.array([ybest, xbest])
                             nnd[ay, ax] = dbest
-                            # d = cal_dist(ay, ax, ybest, xbest,feat_A, feat_AP, feat_B, feat_BP, A_size, B_size, patch_size)
-                # if (dbest != d):
-                #    print('{}up, {} vs {}'.format([ay,ax,ybest,xbest], dbest, d))
 
                 # dowm
                 if (ay + jump) < a_rows and (ay + jump) >= 0:
@@ -191,13 +179,9 @@ def pixelmatch(q, ax_start, ay_start, cpus, nnf, nnd, A_size, B_size, feat_A, fe
                                        feat_B, feat_BP,
                                        A_size, B_size, patch_size)
                         if val < dbest:
-                            # print("update")
                             xbest, ybest, dbest = xp, yp, val
                             nnf[ay, ax] = np.array([ybest, xbest])
                             nnd[ay, ax] = dbest
-                            # d = cal_dist(ay, ax, ybest, xbest,feat_A, feat_AP, feat_B, feat_BP, A_size, B_size, patch_size)
-                # if (dbest != d):
-                #    print('{}down, {} vs {}'.format([ay,ax,ybest,xbest], dbest, d))
 
             rand_d = rand_search_radius
 
@@ -247,53 +231,3 @@ def cal_dist(ay, ax, by, bx, feat_A, feat_AP, feat_B, feat_BP, A_size, B_size, p
     return dist
 
 
-import os 
-package_directory = os.path.dirname(os.path.abspath(__file__))
-
-import numpy as np
-import cv2
-import pycuda.autoinit
-import pycuda.driver as drv
-import numpy
-import pycuda.autoinit
-import pycuda.gpuarray as gpuarray
-import numpy as np
-from pycuda.compiler import SourceModule
-import cv2
-
-from PIL import Image
-def propagate_cuda(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, rand_search_radius=200):
-    mod = SourceModule(open(os.path.join(package_directory,"patchmatch.cu")).read(),no_extern_c=True)
-    patchmatch = mod.get_function("patch_match")
-    
-    rows = feat_A.shape[0]
-    cols = feat_A.shape[1]
-    channels = np.int32(feat_A.shape[2])
-    nnf_t = np.zeros(shape=(rows,cols), dtype=np.uint32)
-    nnd = np.random.rand(*nnf.shape[:2]).astype(np.float32)
-    threads = 20
-    
-    def get_blocks_for_dim(dim,blocks):
-        #if dim % blocks ==0:
-        #    return dim//blocks
-        return dim// blocks +1 
-    patchmatch(
-        drv.In(feat_A),
-        drv.In(feat_AP),
-        drv.In(feat_B),
-        drv.In(feat_BP),
-        drv.InOut(nnf),
-        drv.InOut(nnf_t),
-        drv.InOut(nnd),
-        np.int32(rows),
-        np.int32(cols),
-        channels,
-        np.int32(patch_size),
-        np.int32(iters),
-        np.int32(8),
-        np.int32(rand_search_radius),
-    block=(threads,threads,1),
-    grid=(get_blocks_for_dim(rows,threads),
-          get_blocks_for_dim(cols,threads)))
-
-    return nnf, nnd

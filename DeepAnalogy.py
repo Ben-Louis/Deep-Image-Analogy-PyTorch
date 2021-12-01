@@ -1,13 +1,16 @@
 from VGG19 import Vgg19
-from PatchMatchOrig import init_nnf, upSample_nnf, avg_vote, propagate, propagate_cuda
+from PatchMatchCpu import init_nnf, upSample_nnf, propagate, avg_vote
 import torch
 import torch.nn.functional as F
 import numpy as np
 import copy
 from utils import *
 import time
+try:
+    from PatchMatchCuda import propagate, avg_vote
+except ImportError:
+    pass
 
-propagate = propagate_cuda
 def analogy(img_A, img_BP, config):
     start_time_0 = time.time()
 
@@ -93,8 +96,8 @@ def analogy(img_A, img_BP, config):
 
 
     print('\n- reconstruct images A\' and B')
-    img_AP = avg_vote(ann_AB, img_BP, config.pm_sizes[stage])
-    img_B = avg_vote(ann_BA, img_A, config.pm_sizes[stage])
+    img_AP = avg_vote(ann_AB, img_BP.astype(np.float32), config.pm_sizes[stage])
+    img_B = avg_vote(ann_BA, img_A.astype(np.float32), config.pm_sizes[stage])
     img_AP = img_AP.clip(min=0, max=255).astype(np.uint8)
     img_B = img_B.clip(min=0, max=255).astype(np.uint8)
 
