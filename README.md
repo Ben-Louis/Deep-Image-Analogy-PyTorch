@@ -1,7 +1,6 @@
-Deep-Image-Analogy
+# Deep-Image-Analogy
 
 [![996.ICU](https://img.shields.io/badge/link-996.icu-red.svg)](https://996.icu)
-==============================
 
 This project is a python implementation of Deep Image Analogy.https://arxiv.org/abs/1705.01088.
 
@@ -21,16 +20,18 @@ This project is a python implementation of Deep Image Analogy.https://arxiv.org/
 
    See [pytorch](http://pytorch.org/) for installation
 
-   Codes in branch "master" works with pytorch 0.4
+   Codes in branch "master" works with pytorch >= 0.4
 
    Codes in branch "pytorch0.3" works with pytorch 0.3
 
  - cuda (CPU version is not implemented yet)
 
+ - [pycuda]([pycuda · PyPI](https://pypi.org/project/pycuda/)) (optional)
+
 ## Usage (demo)
 
 ```bash
-python main.py --resize_ratio 0.5 --weight 2 --img_A_path data/demo/ava.png --img_BP_path data/demo/mona.png --use_cuda True
+python main.py --resize_ratio 0.5 --weight 2 --img_A_path data/demo/ava.png --img_BP_path data/demo/mona.png --use_cuda
 ```
 
 ## Acknowledgments
