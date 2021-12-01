@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-def lbfgs(f, init, maxIter=50, gEps=1e-8, histSize=10, lr=1.0, clamp=False, display=False):
+def lbfgs(f, init, maxIter=50, gEps=1e-9, histSize=10, lr=1.0, clamp=False, display=False):
     """
     input:
         f: a function
@@ -19,7 +19,6 @@ def lbfgs(f, init, maxIter=50, gEps=1e-8, histSize=10, lr=1.0, clamp=False, disp
     xk = init
     fk, gk = f(xk)
     H0 = 1.0
-    evals = 1
     step = 0
     stat = "LBFGS REACH MAX ITER"
     alpha = list(range(histSize))
@@ -28,48 +27,37 @@ def lbfgs(f, init, maxIter=50, gEps=1e-8, histSize=10, lr=1.0, clamp=False, disp
     y = []
 
     for it in range(maxIter):
-        #print(len(alpha), len(rho), len(s), len(y))
-        if display and it%20==0:            
-            print("LBFGS | iter:{}; loss:{:.4f}; grad:{:.4f}; step:{:.5f}".format(it, fk, np.sqrt(torch.sum((gk)**2)), step))
+        if display and (it + 1) % 20 == 0:
+            print(f"LBFGS | iter:{it+1}; loss:{fk:.4f}; grad:{gk.pow(2).sum().pow(0.5).item():.4f}; step:{step:.5f}")
         if clamp:
             xk = xk.clamp(0, 1e7)
 
-        xSquaredNorm = torch.sum(xk * xk)
-        gSquaredNorm = torch.sum(gk * gk)
-        if gSquaredNorm < (gEps**2) * xSquaredNorm:
+        xSquaredNorm = xk.pow(2).sum()
+        gSquaredNorm = gk.pow(2).sum()
+        if gSquaredNorm < (gEps ** 2) * xSquaredNorm:
             stat = "LBFGS BELOW GRADIENT EPS"
             return xk, stat
 
         z = -gk
 
         maxIdx = min(it, histSize)
-
         for i in range(maxIdx):
             alpha[i] = s[i].dot(z) * rho[i]
             z -= alpha[i] * y[i]
 
         z *= H0
-
         for i in range(maxIdx-1, -1, -1):
             beta = rho[i] * y[i].dot(z)
             z += s[i] * (alpha[i] - beta)
 
         fkm1, gkm1 = fk, gk
         
-        
-        step, stat_ls, args = linesearch(xk.clone(), z, f, fk, gk.clone(), fkm1,gkm1.clone(), 10000, lr)
+        step, stat_ls, args = linesearch(xk.clone(), z, f, fk, gk.clone(), fkm1, gkm1.clone(), 10000, lr)
         if step is None:
             xk, fk, gk = args 
             return xk, stat_ls
         else:
             xk, fk, gk = args 
-        """
-        step = 1.0
-        xk += step * z
-        fk, gk = f(xk)
-        #if (gk==gkm1).any():
-        #    print("error!")
-        """
 
         if it >= histSize:
             s.pop(0)
@@ -92,14 +80,7 @@ def lbfgs(f, init, maxIter=50, gEps=1e-8, histSize=10, lr=1.0, clamp=False, disp
     return xk, stat
 
 
-
-
-
-
 def linesearch(xk, z, f, fk, gk, fkm1, gkm1, maxEvals, lr):
-    """
-    """
-
     c1 = 1e-4
     c2 = 0.9
     evals = 0
@@ -182,19 +163,7 @@ def linesearch(xk, z, f, fk, gk, fkm1, gkm1, maxEvals, lr):
     minTries = 10
 
     while True:
-        tries += 1        
-
-        """
-        alpha_old = alpha
-        alpha = 0.5 * (alpha_low + alpha_high)
-        try:
-            alpha += (phi_high - phi_low) / (phi_prime_low - phi_prime_high)
-        except ZeroDivisionError:
-            print(alpha, phi_prime_low, phi_prime_high)
-
-        if (alpha < alpha_low and alpha > alpha_high):
-            alpha = 0.5 * (alpha_low + alpha_high)
-        """
+        tries += 1
 
         xk += alpha_cor * z
 
@@ -205,13 +174,13 @@ def linesearch(xk, z, f, fk, gk, fkm1, gkm1, maxEvals, lr):
         phi_prime_j = z.dot(gk)
 
         armijo_violated = (phi_j > phi_0 + c1 * alpha * phi_prime_0 or phi_j >= phi_low)
-        strong_wolfe = (torch.abs(phi_prime_j) <= -c2 * phi_prime_0);
+        strong_wolfe = (torch.abs(phi_prime_j) <= -c2 * phi_prime_0)
 
         if (not armijo_violated) and strong_wolfe:
             stat = "LINE SEARCH DONE"
             return alpha, stat, [xk, fk, gk]
 
-        elif np.abs(alpha_high - alpha_low) < 1e-5 and tries > minTries:
+        elif abs(alpha_high - alpha_low) < 1e-5 and tries > minTries:
             stat = "LINE SEARCH FAILED"
             return None, stat, [xk, fk, gk]
 
@@ -241,6 +210,3 @@ def linesearch(xk, z, f, fk, gk, fkm1, gkm1, maxEvals, lr):
         if evals >= maxEvals:
             stat = "LINE SEARCH REACHED MAX EVALS"
             return None, stat, [xk, fk, gk]
-
-
-
