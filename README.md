@@ -16,22 +16,20 @@ This project is a python implementation of Deep Image Analogy.https://arxiv.org/
 
    If you use anaconda, you can install opencv3 by  ```conda install opencv```
 
- - pytorch
+ - [pytorch](http://pytorch.org/) >= 1.7
 
-   See [pytorch](http://pytorch.org/) for installation
-
-   Codes in branch "master" works with pytorch >= 0.4
-
-   Codes in branch "pytorch0.3" works with pytorch 0.3
-
- - cuda (CPU version is not implemented yet)
-
- - [pycuda]([pycuda · PyPI](https://pypi.org/project/pycuda/)) (optional)
+ - [pycuda](https://pypi.org/project/pycuda/) (optional)
 
 ## Usage (demo)
 
+- Use GPU
 ```bash
-python main.py --resize_ratio 0.5 --weight 2 --img_A_path data/demo/ava.png --img_BP_path data/demo/mona.png --use_cuda
+python main.py --use_cuda
+```
+
+- CPU only
+```bash
+python main.py
 ```
 
 ## Acknowledgments

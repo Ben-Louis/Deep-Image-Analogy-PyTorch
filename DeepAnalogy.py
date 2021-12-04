@@ -6,18 +6,19 @@ import numpy as np
 import copy
 from utils import *
 import time
-try:
-    from PatchMatchCuda import propagate, avg_vote
-except ImportError:
-    pass
+
 
 def analogy(img_A, img_BP, config):
     start_time_0 = time.time()
 
     if config.use_cuda:
         device = torch.device('cuda:0')
+        try:
+            from PatchMatchCuda import propagate, avg_vote
+        except ImportError:
+            pass
     else:
-        raise NotImplementedError("CPU mode is not supported yet. Please run with '--use_cuda'")
+        device = "cpu"
 
     # preparing data
     model = Vgg19(device=device)
