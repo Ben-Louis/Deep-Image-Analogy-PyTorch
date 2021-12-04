@@ -5,6 +5,55 @@ import torchvision.models as models
 from lbfgs import lbfgs
 
 
+class InverseBlock(nn.Module):
+    def __init__(self, in_chn, out_chn):
+        super(InverseBlock, self).__init__()
+
+        self.upsample = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode="bilinear"),
+            nn.Conv2d(in_chn, out_chn, 1, 1, bias=False),
+            nn.BatchNorm2d(out_chn)
+        )
+
+        self.residual = nn.Sequential(
+            nn.Conv2d(in_chn, out_chn * 2, 1, 1, bias=False),
+            nn.BatchNorm2d(out_chn * 2),
+            nn.LeakyReLU(0.02, inplace=True),
+            nn.Conv2d(out_chn * 2, out_chn * 2, 3, 1, 1, bias=False, groups=16),
+            nn.BatchNorm2d(out_chn * 2),
+            nn.LeakyReLU(0.02, inplace=True),
+            nn.Conv2d(out_chn * 2, out_chn * 2, 1, 1, bias=False),
+            nn.BatchNorm2d(out_chn * 2),
+            nn.LeakyReLU(0.02, inplace=True),
+            nn.ConvTranspose2d(out_chn * 2, out_chn * 2, 4, 2, 1, bias=False, groups=16),
+            nn.BatchNorm2d(out_chn * 2),
+            nn.LeakyReLU(0.02, inplace=True),
+            nn.Conv2d(out_chn * 2, out_chn, 1, 1, bias=False),
+            nn.BatchNorm2d(out_chn)
+        )
+
+        self.output = nn.Sequential(
+            nn.LeakyReLU(0.02, inplace=True),
+            nn.Conv2d(out_chn, out_chn, 1, 1)
+        )
+
+    def forward(self, x):
+        return self.output(self.upsample(x) + self.residual(x))
+
+
+class InvertVgg(nn.Module):
+    def __init__(self):
+        super(InvertVgg, self).__init__()
+
+        self.stage5 = InverseBlock(512, 512)
+        self.stage4 = InverseBlock(512, 256)
+        self.stage3 = InverseBlock(256, 128)
+        self.stage2 = InverseBlock(128, 64)
+
+    def forward(self, feats):
+        return {i-1:getattr(self, f"stage{i}")(feats[i]) for i in range(2, 6)}
+
+
 class Vgg19:
     def __init__(self, device):
         self.device = device
@@ -25,6 +74,13 @@ class Vgg19:
 
         self.mean_ = torch.tensor((103.939, 116.779, 123.68)).to(device).view(1, 3, 1, 1)
 
+        if device == "cpu":
+            invert_model = InvertVgg()
+            invert_model.load_state_dict(torch.load("invert_vgg.ckpt"))
+            invert_model = invert_model.eval().to(device)
+            for i in range(2, 6):
+                setattr(self, f"inv_stage{i}", getattr(invert_model, f"stage{i}"))
+
     def get_features(self, img):
         img = img.float().to(self.device)
         if img.dim() == 3: img = img.unsqueeze(0)
@@ -41,6 +97,13 @@ class Vgg19:
         source = init.float().to(self.device)
         target = feat.float().to(self.device)
         source_size = source.size()
+
+        if self.device == "cpu":
+            with torch.no_grad():
+                output = getattr(self, f"inv_stage{stage}")(target)
+                loss = (getattr(self, f"stage{stage}")(output) - target).pow(2).mean()
+                print(f"loss: {loss:.2f}")
+            return output.float()
 
         # ================
         def loss_func(x):

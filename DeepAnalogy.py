@@ -1,23 +1,23 @@
 from VGG19 import Vgg19
-from PatchMatchCpu import init_nnf, upSample_nnf, propagate, avg_vote
+from PatchMatch import init_nnf, upSample_nnf, propagate_func, avg_vote_func
 import torch
 import torch.nn.functional as F
 import numpy as np
 import copy
 from utils import *
 import time
-try:
-    from PatchMatchCuda import propagate, avg_vote
-except ImportError:
-    pass
+
 
 def analogy(img_A, img_BP, config):
     start_time_0 = time.time()
 
     if config.use_cuda:
-        device = torch.device('cuda:0')
+        device = "cuda:0"
+        propagate = propagate_func.get("gpu", propagate_func["cpu"])
+        avg_vote = avg_vote_func.get("gpu", avg_vote_func["cpu"])
     else:
-        raise NotImplementedError("CPU mode is not supported yet. Please run with '--use_cuda'")
+        device = "cpu"
+        propagate, avg_vote = propagate_func["cpu"], avg_vote_func["cpu"]
 
     # preparing data
     model = Vgg19(device=device)
