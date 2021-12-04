@@ -26,8 +26,8 @@ def int_to_xy(nnf_t):
     return nnf
 
 
-def propagate(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, rand_search_radius=200):
-    mod = SourceModule(open(os.path.join(package_directory,"GeneralizedPatchMatch.cu")).read(), no_extern_c=True)
+def propagate_gpu(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, rand_search_radius=200):
+    mod = SourceModule(open(os.path.join(package_directory, "GeneralizedPatchMatch.cu")).read(), no_extern_c=True)
     patchmatch = mod.get_function("patch_match")
     
     rows = feat_A.shape[0]
@@ -59,14 +59,14 @@ def propagate(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, rand_s
     return int_to_xy(nnf_t), nnd
 
 
-def avg_vote(nnf, img, patch_size):
-    mod = SourceModule(open(os.path.join(package_directory,"GeneralizedPatchMatch.cu")).read(), no_extern_c=True)
-    avg_vote_cu = mod.get_function("avg_vote")
+def avg_vote_gpu(nnf, img, patch_size):
+    mod = SourceModule(open(os.path.join(package_directory, "GeneralizedPatchMatch.cu")).read(), no_extern_c=True)
+    avg_vote = mod.get_function("avg_vote")
 
     output = np.zeros([img.shape[-1], *nnf.shape[:2]], dtype=np.float32)
     threads = 20
 
-    avg_vote_cu(
+    avg_vote(
         drv.In(xy_to_int(nnf)),
         drv.In(np.ascontiguousarray(img.transpose(2, 0, 1))),
         drv.InOut(output),
