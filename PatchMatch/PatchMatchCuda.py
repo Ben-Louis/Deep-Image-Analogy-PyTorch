@@ -52,9 +52,10 @@ def propagate_gpu(nnf, feat_A, feat_AP, feat_B, feat_BP, patch_size, iters=2, ra
         np.int32(patch_size),
         np.int32(iters),
         np.int32(rand_search_radius),
-    block=(threads,threads,1),
-    grid=(get_blocks_for_dim(rows,threads),
-          get_blocks_for_dim(cols,threads)))
+        block=(threads,threads,1),
+        grid=(get_blocks_for_dim(rows,threads),
+              get_blocks_for_dim(cols,threads))
+    )
 
     return int_to_xy(nnf_t), nnd
 
@@ -79,6 +80,6 @@ def avg_vote_gpu(nnf, img, patch_size):
         block=(threads,threads,1),
         grid=(get_blocks_for_dim(nnf.shape[0], threads),
               get_blocks_for_dim(nnf.shape[1], threads))
-        )
+    )
 
     return np.ascontiguousarray(output.transpose(1, 2, 0))

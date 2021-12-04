@@ -1,16 +1,7 @@
-﻿
+// This code is copied from https://github.com/msracver/Deep-Image-Analogy
 
 #include <stdio.h>
-// #include <cmath>
-// #include "opencv2/opencv.hpp"
 #include <curand_kernel.h>
-// #include "time.h"
-// #include "device_launch_parameters.h"
-// #include "device_functions.h"
-// #include "math_constants.h"
-// #include "cuda_runtime.h"
-// using namespace cv;
-// using namespace std;
 #define FLT_MIN 1.175494351e-38F 
 
 __host__ __device__ int clamp(int x, int x_max, int x_min) {//assume x_max >= x_min
@@ -197,17 +188,6 @@ __global__ void patch_match(float * a, float * b, float *a1, float *b1, unsigned
 	int ax = blockIdx.x*blockDim.x + threadIdx.x;
 	int ay = blockIdx.y*blockDim.y + threadIdx.y;
 
-	//assign params
-	// int ch = params[0];
-	// int a_rows = params[1];
-	// int a_cols = params[2];
-	// int b_rows = params[3];
-	// int b_cols = params[4];
-	// int patch_w = params[5];
-	// int pm_iters = params[6];
-	// int rs_max = params[7];
-
-
 	if (ax < a_cols && ay < a_rows) {
 	
 		// for random number
@@ -299,9 +279,6 @@ __global__ void patch_match(float * a, float * b, float *a1, float *b1, unsigned
 
 			/* Random search: Improve current guess by searching in boxes of exponentially decreasing size around the current best guess. */
 			int rs_start = rs_max;
-			//if (rs_start > cuMax(b_cols, b_rows)) {
-			//	rs_start = cuMax(b_cols, b_rows);
-			//}
 			for (int mag = rs_start; mag >= 1; mag /= 2) {
 				/* Sampling window */
 				xmin = cuMax(xbest - mag, 0), xmax = cuMin(xbest + mag + 1, b_cols);
@@ -355,13 +332,6 @@ __global__ void avg_vote(unsigned int * ann, float * pb, float * pc, int ch, int
 
 	int ax = blockIdx.x*blockDim.x + threadIdx.x;
 	int ay = blockIdx.y*blockDim.y + threadIdx.y;
-
-	// int ch = params[0];
-	// int ah = params[1];
-	// int aw = params[2];
-	// int bh = params[3];
-	// int bw = params[4];
-	// int patch_w = params[5];
 
 	int slice_a = ah * aw;
 	int pitch_a = aw;

@@ -16,7 +16,7 @@ This project is a python implementation of [Deep Image Analogy](https://arxiv.or
 
    If you use anaconda, you can install opencv3 by  ```conda install opencv```
 
- - [pytorch](http://pytorch.org/) >= 1.7
+ - [pytorch](http://pytorch.org/) (>= 1.7 for cpu-only mode, >= 1.3 for gpu mode)
 
  - [pycuda](https://pypi.org/project/pycuda/) (optional)
 
